@@ -24,26 +24,26 @@ jobs:
         with:
           python-version: "3.9"
 
-      # Secretsと環境変数のデバッグ
+      # Inputsのデバッグ
       - name: Debug Inputs and Environment Variables
+        env:
+          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+          GITHUB_TOKEN: ${{ inputs.github_token }}
         run: |
           echo "Debugging Inputs and Environment Variables..."
-          if [ -z "${{ inputs.openai_api_key }}" ]; then
+          if [ -z "${OPENAI_API_KEY}" ]; then
             echo "Error: openai_api_key is not provided as an input."
             exit 1
           else
             echo "openai_api_key is set."
           fi
 
-          if [ -z "${{ inputs.github_token }}" ]; then
+          if [ -z "${GITHUB_TOKEN}" ]; then
             echo "Error: github_token is not provided as an input."
             exit 1
           else
             echo "github_token is set."
           fi
-        env:
-          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
-          GITHUB_TOKEN: ${{ inputs.github_token }}
 
       # 必要な依存関係をインストール
       - name: Install dependencies

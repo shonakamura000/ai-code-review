@@ -31,18 +31,26 @@ def main():
 
     # 2. OpenAI APIキーのセット
     openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    
+    # 3. baseブランチ(main) を fetch し、base...HEAD の差分を取得
+    #    ※ baseブランチが "main" ではない場合は適宜変更
+    subprocess.run(["git", "fetch", "origin", "main"], check=True)
 
-    # 3. git diff の取得
-    diff_result = subprocess.run(["git", "diff", "HEAD~1", "HEAD"], capture_output=True, text=True)
+    diff_result = subprocess.run(
+        ["git", "diff", "origin/main...HEAD"], 
+        capture_output=True, 
+        text=True
+    )
     diff_text = diff_result.stdout
 
     if not diff_text.strip():
         print("差分がないのでコードレビューできません。")
         return
 
+    # 4. OpenAIへレビュー依頼
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",  # 例: "gpt-3.5-turbo" や "gpt-4" などに変更可
+            model="gpt-4o-mini",  # 例: "gpt-3.5-turbo" や "gpt-4" など
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {
@@ -55,7 +63,7 @@ def main():
         print(f"OpenAI API へのリクエストでエラーが発生しました: {e}")
         return
 
-    # ChatCompletion は choices[0].message["content"] から取得
+    # ChatCompletion のレスポンスを取り出す
     try:
         review_comment = response.choices[0].message["content"]
     except (IndexError, KeyError) as e:
@@ -66,7 +74,6 @@ def main():
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
-    # "pull_request" キーがない場合を考慮
     if "pull_request" not in payload:
         print("このイベントは pull_request ではありません。")
         return

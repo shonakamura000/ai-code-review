@@ -49,9 +49,9 @@ def post_comment_to_pr(repo, pr_number, body, token):
     data = {"body": body}
     resp = requests.post(url, headers=headers, json=data)
     if resp.status_code == 201:
-        print("コメント投稿成功やで！")
+        print("コメント投稿成功です！")
     else:
-        print(f"コメント投稿失敗や…ステータスコード: {resp.status_code}")
+        print(f"コメント投稿失敗です…ステータスコード: {resp.status_code}")
         print(resp.text)
 
 if __name__ == "__main__":

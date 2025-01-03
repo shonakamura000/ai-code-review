@@ -1,7 +1,15 @@
+# ai_review_reusable.yml (reusable workflow)
 name: AI Review Reusable
 
 on:
   workflow_call:
+    inputs:
+      repo_full_name:
+        type: string        # <-- typeを追加
+        required: true
+      repo_ref:
+        type: string        # <-- typeを追加
+        required: true
     secrets:
       OPENAI_API_KEY:
         required: true
@@ -13,9 +21,8 @@ jobs:
       - name: Check out caller code
         uses: actions/checkout@v3
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-
+          repository: ${{ inputs.repo_full_name }}
+          ref: ${{ inputs.repo_ref }}
 
       - name: Debug directory structure
         run: |

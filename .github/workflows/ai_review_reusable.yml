@@ -2,7 +2,6 @@ name: AI Review Reusable
 
 on:
   workflow_call:
-    # 「secrets」で宣言すると、値が隠蔽された状態で渡せる
     secrets:
       OPENAI_API_KEY:
         required: true
@@ -14,12 +13,17 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
+      - name: Debug directory structure
+        run: |
+          echo "Listing directory structure..."
+          ls -R
+          echo "Done listing directory structure."
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      # 受け取った secrets をデバッグ出力 (必要に応じて省略可)
       - name: Debug Secrets
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -56,5 +60,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Running AI Review script..."
-          # ここでAIレビュー用のPythonスクリプトを実行
           python src/scripts/run_ai_review.py

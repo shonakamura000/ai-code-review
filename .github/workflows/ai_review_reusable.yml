@@ -5,13 +5,10 @@ on:
     inputs:
       openai_api_key:
         required: true
-      run_ai_review_script:
+        type: string
+      github_token:
         required: true
-    secrets:
-      GITHUB_TOKEN:
-        required: true
-      OPENAI_API_KEY:
-        required: true
+        type: string
 
 jobs:
   ai-review:
@@ -31,7 +28,7 @@ jobs:
 
       - name: Run AI Review
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+          GITHUB_TOKEN: ${{ inputs.github_token }}
         run: |
           python scripts/run_ai_review.py

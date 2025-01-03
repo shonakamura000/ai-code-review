@@ -1,37 +1,35 @@
 # ファイル例: scripts/run_ai_review.py
 import os
 import requests
-import openai
+from openai import OpenAI
 import subprocess
 
 def main():
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
     github_token = os.environ.get("GITHUB_TOKEN")
     
-    # 差分を取得 (今回はGitHub Actions内やから直接 git diff で取得してみる)
+
     diff_result = subprocess.run(["git", "diff", "HEAD~1", "HEAD"], capture_output=True, text=True)
     diff_text = diff_result.stdout
 
     if not diff_text.strip():
-        print("差分がないで。レビューする対象がないかもしれへん")
+        print("差分がないのでコードレビューできません。")
         return
 
-    # AIで解析
-    prompt = f"以下のdiffをレビューして、問題点や改善提案をコメント用に出力してや。\n{diff_text}"
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=800,
-        temperature=0.2
-    )
+    response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
+                    {"role": "user", "content": "以下のdiffをレビューして、問題点や改善提案をコメント用に出力してください。\n{diff_text}"}
+                ],
+            )
+    
     review_comment = response.choices[0].message.content
 
     # GITHUB_REPOSITORY, GITHUB_EVENT_PATH なんかで環境変数から情報取れる
-    repo = os.environ["GITHUB_REPOSITORY"]          # "ユーザ名/リポジトリ名"
-    event_path = os.environ["GITHUB_EVENT_PATH"]    # pull_request情報がJSONで入っとるファイル
+    repo = os.environ["GITHUB_REPOSITORY"]         
+    event_path = os.environ["GITHUB_EVENT_PATH"]   
 
     with open(event_path, "r", encoding="utf-8") as f:
         event_data = f.read()

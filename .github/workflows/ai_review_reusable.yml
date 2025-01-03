@@ -2,66 +2,61 @@ name: AI Review Reusable
 
 on:
   workflow_call:
-    inputs:
-      openai_api_key:
+    # 「secrets」で宣言すると、値が隠蔽された状態で渡せる
+    secrets:
+      OPENAI_API_KEY:
         required: true
-        type: string
-      github_token:
+      GITHUB_TOKEN:
         required: true
-        type: string
 
 jobs:
   ai-review:
     runs-on: ubuntu-latest
     steps:
-      # コードをチェックアウト
       - name: Check out code
         uses: actions/checkout@v3
 
-      # Pythonをセットアップ
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      # Inputsのデバッグ
-      - name: Debug Inputs and Environment Variables
+      # 受け取った secrets をデバッグ出力 (必要に応じて省略可)
+      - name: Debug Secrets
         env:
-          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
-          GITHUB_TOKEN: ${{ inputs.github_token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Debugging Inputs and Environment Variables..."
-          if [ -z "${OPENAI_API_KEY}" ]; then
-            echo "Error: openai_api_key is not provided as an input."
+          echo "Debugging secrets from reusable workflow..."
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Error: OPENAI_API_KEY was not passed."
             exit 1
           else
-            echo "openai_api_key is set."
+            echo "OPENAI_API_KEY is set."
           fi
 
-          if [ -z "${GITHUB_TOKEN}" ]; then
-            echo "Error: github_token is not provided as an input."
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "Error: GITHUB_TOKEN was not passed."
             exit 1
           else
-            echo "github_token is set."
+            echo "GITHUB_TOKEN is set."
           fi
 
-      # 必要な依存関係をインストール
       - name: Install dependencies
         run: |
           echo "Installing dependencies..."
           pip install openai requests
 
-      # 依存関係インストールの確認
       - name: Verify Python Packages
         run: |
           echo "Verifying installed packages..."
           pip list
 
-      # AIレビューを実行
       - name: Run AI Review
         env:
-          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
-          GITHUB_TOKEN: ${{ inputs.github_token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Running AI Review script..."
+          # ここでAIレビュー用のPythonスクリプトを実行
           python scripts/run_ai_review.py

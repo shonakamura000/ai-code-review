@@ -25,8 +25,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           path: caller
+          fetch-depth: 0
 
       - name: Debug directory structure
         run: |

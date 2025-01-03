@@ -1,15 +1,7 @@
-# ai_review_reusable.yml (reusable workflow)
 name: AI Review Reusable
 
 on:
   workflow_call:
-    inputs:
-      repo_full_name:
-        type: string
-        required: true
-      repo_ref:
-        type: string
-        required: true
     secrets:
       OPENAI_API_KEY:
         required: true
@@ -18,14 +10,24 @@ jobs:
   ai-review:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out caller code
+
+      # 1) Reusable Workflow リポジトリを checkout
+      #    ここに "scripts/run_ai_review.py" がある想定。
+      - name: Check out this (Reusable Workflow) repo
         uses: actions/checkout@v3
         with:
-          repository: ${{ inputs.repo_full_name }}
-          ref: ${{ inputs.repo_ref }}
-          # 必要に応じてフォーク対応するなら:
-          # token: ${{ secrets.GITHUB_TOKEN }}
-          # persist-credentials: false
+          # 自分自身のリポジトリ (= スクリプトがあるレポ)
+          repository: my-user/ai-code-review  # ← あなたの公開リポジトリ名に変える
+          ref: main   # 必要に応じてブランチやタグ
+
+      # 2) Caller (ユーザ) リポジトリを checkout
+      #    "caller" というサブフォルダに配置しておく
+      - name: Check out caller repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          path: caller
 
       - name: Debug directory structure
         run: |
@@ -41,7 +43,7 @@ jobs:
       - name: Debug Secrets
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # ← 必要ならこのまま
         run: |
           echo "Debugging secrets from reusable workflow..."
           if [ -z "$OPENAI_API_KEY" ]; then
@@ -51,6 +53,7 @@ jobs:
             echo "OPENAI_API_KEY is set."
           fi
 
+          # GITHUB_TOKEN が無くても構わないならチェック削除してOK
           if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN was not passed."
             exit 1
@@ -72,4 +75,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Running AI Review script..."
-          python src/scripts/run_ai_review.py
+          # Reusable Workflow リポジトリの scripts/ ディレクトリに入っているスクリプトを実行
+          # Caller のコードは "caller" フォルダ配下にある
+          python scripts/run_ai_review.py --target=caller

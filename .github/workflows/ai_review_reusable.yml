@@ -1,21 +1,39 @@
-name: AI Review Reusable
+name: AI Code Review
 
 on:
-  workflow_call:
-    inputs:
-      openai_api_key:
-        required: true
-        type: string
-      github_token:
-        required: true
-        type: string
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
   ai-review:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Debug Secrets
+        run: |
+          echo "Checking secrets..."
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Error: OPENAI_API_KEY is not set in Secrets."
+            exit 1
+          else
+            echo "OPENAI_API_KEY is set."
+          fi
+
+          if [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "Error: GITHUB_TOKEN is not set in Secrets."
+            exit 1
+          else
+            echo "GITHUB_TOKEN is set."
+          fi
+
+      - name: Debug Environment Variables
+        run: |
+          echo "Checking environment variables..."
+          echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}"
+          echo "GITHUB_TOKEN=${{ env.GITHUB_TOKEN }}"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,7 +46,7 @@ jobs:
 
       - name: Run AI Review
         env:
-          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
-          GITHUB_TOKEN: ${{ inputs.github_token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python scripts/run_ai_review.py

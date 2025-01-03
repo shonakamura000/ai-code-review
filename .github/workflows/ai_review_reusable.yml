@@ -5,10 +5,10 @@ on:
   workflow_call:
     inputs:
       repo_full_name:
-        type: boolean
+        type: string        # <-- typeを追加
         required: true
       repo_ref:
-        type: boolean
+        type: string        # <-- typeを追加
         required: true
     secrets:
       OPENAI_API_KEY:
@@ -21,14 +21,8 @@ jobs:
       - name: Check out caller code
         uses: actions/checkout@v3
         with:
-          # ここを inputs から受け取る
           repository: ${{ inputs.repo_full_name }}
           ref: ${{ inputs.repo_ref }}
-          # forkからのPRをチェックアウトしたい場合、
-          # 追加で指定するなら:
-          # token: ${{ secrets.GITHUB_TOKEN }}
-          # persist-credentials: false
-          # 等が必要になるケースもあります
 
       - name: Debug directory structure
         run: |

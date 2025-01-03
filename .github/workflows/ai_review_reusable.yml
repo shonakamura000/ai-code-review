@@ -1,7 +1,15 @@
+# ai_review_reusable.yml (reusable workflow)
 name: AI Review Reusable
 
 on:
   workflow_call:
+    inputs:
+      repo_full_name:
+        type: boolean
+        required: true
+      repo_ref:
+        type: boolean
+        required: true
     secrets:
       OPENAI_API_KEY:
         required: true
@@ -13,9 +21,14 @@ jobs:
       - name: Check out caller code
         uses: actions/checkout@v3
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-
+          # ここを inputs から受け取る
+          repository: ${{ inputs.repo_full_name }}
+          ref: ${{ inputs.repo_ref }}
+          # forkからのPRをチェックアウトしたい場合、
+          # 追加で指定するなら:
+          # token: ${{ secrets.GITHUB_TOKEN }}
+          # persist-credentials: false
+          # 等が必要になるケースもあります
 
       - name: Debug directory structure
         run: |

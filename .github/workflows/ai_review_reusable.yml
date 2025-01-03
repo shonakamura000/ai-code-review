@@ -1,52 +1,67 @@
-name: AI Code Review
+name: AI Review Reusable
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  workflow_call:
+    inputs:
+      openai_api_key:
+        required: true
+        type: string
+      github_token:
+        required: true
+        type: string
 
 jobs:
   ai-review:
     runs-on: ubuntu-latest
-
     steps:
+      # コードをチェックアウト
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Debug Secrets
-        run: |
-          echo "Checking secrets..."
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
-            echo "Error: OPENAI_API_KEY is not set in Secrets."
-            exit 1
-          else
-            echo "OPENAI_API_KEY is set."
-          fi
-
-          if [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
-            echo "Error: GITHUB_TOKEN is not set in Secrets."
-            exit 1
-          else
-            echo "GITHUB_TOKEN is set."
-          fi
-
-      - name: Debug Environment Variables
-        run: |
-          echo "Checking environment variables..."
-          echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}"
-          echo "GITHUB_TOKEN=${{ env.GITHUB_TOKEN }}"
-
+      # Pythonをセットアップ
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
+      # Secretsと環境変数のデバッグ
+      - name: Debug Inputs and Environment Variables
+        run: |
+          echo "Debugging Inputs and Environment Variables..."
+          if [ -z "${{ inputs.openai_api_key }}" ]; then
+            echo "Error: openai_api_key is not provided as an input."
+            exit 1
+          else
+            echo "openai_api_key is set."
+          fi
+
+          if [ -z "${{ inputs.github_token }}" ]; then
+            echo "Error: github_token is not provided as an input."
+            exit 1
+          else
+            echo "github_token is set."
+          fi
+        env:
+          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+          GITHUB_TOKEN: ${{ inputs.github_token }}
+
+      # 必要な依存関係をインストール
       - name: Install dependencies
         run: |
+          echo "Installing dependencies..."
           pip install openai requests
 
+      # 依存関係インストールの確認
+      - name: Verify Python Packages
+        run: |
+          echo "Verifying installed packages..."
+          pip list
+
+      # AIレビューを実行
       - name: Run AI Review
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+          GITHUB_TOKEN: ${{ inputs.github_token }}
         run: |
+          echo "Running AI Review script..."
           python scripts/run_ai_review.py

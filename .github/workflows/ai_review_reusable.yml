@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           # 自分自身のリポジトリ (= スクリプトがあるレポ)
-          repository: my-user/ai-code-review  # ← あなたの公開リポジトリ名に変える
+          repository: shonakamura000/ai-code-review  # ← あなたの公開リポジトリ名に変える
           ref: main   # 必要に応じてブランチやタグ
 
       # 2) Caller (ユーザ) リポジトリを checkout

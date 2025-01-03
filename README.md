@@ -20,7 +20,7 @@
 
    jobs:
      ai-review:
-       uses: <your-username>/<repository-name>/.github/workflows/ai_review.yml@main
+       uses: shonakamura000/ai-code-review/.github/workflows/ai_review.yml@main
        with:
          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
          github_token: ${{ secrets.GITHUB_TOKEN }}

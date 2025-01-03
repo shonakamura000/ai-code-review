@@ -57,4 +57,4 @@ jobs:
         run: |
           echo "Running AI Review script..."
           # ここでAIレビュー用のPythonスクリプトを実行
-          python scripts/run_ai_review.py
+          python src/scripts/run_ai_review.py

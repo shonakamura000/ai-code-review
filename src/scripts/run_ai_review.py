@@ -8,70 +8,49 @@ from openai import OpenAI
 import requests
 
 def main():
-    # 1. 環境変数の取得
+    # 環境変数と設定の取得
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-    if not OPENAI_API_KEY:
-        print("Error: OPENAI_API_KEY が設定されていません。")
-        return
-
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-    if not GITHUB_TOKEN:
-        print("Error: GITHUB_TOKEN が設定されていません。")
-        return
-
     repo = os.environ.get("GITHUB_REPOSITORY")
-    if not repo:
-        print("Error: GITHUB_REPOSITORY が設定されていません。")
-        return
-
     event_path = os.environ.get("GITHUB_EVENT_PATH")
-    if not event_path or not os.path.isfile(event_path):
-        print("Error: GITHUB_EVENT_PATH が無効です。")
+
+    if not all([OPENAI_API_KEY, GITHUB_TOKEN, repo, event_path]):
+        print("必要な環境変数が設定されていません。")
         return
 
-    # 2. OpenAI APIキーのセット
     openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    
-    # 3. baseブランチ(main) を fetch し、base...HEAD の差分を取得
+
+    # PR差分の取得
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
-
     diff_result = subprocess.run(
-        ["git", "diff", "origin/main...HEAD"], 
-        capture_output=True, 
-        text=True
+        ["git", "diff", "origin/main...HEAD"], capture_output=True, text=True
     )
-    diff_text = diff_result.stdout
+    diff_text = diff_result.stdout.strip()
 
-    if not diff_text.strip():
-        print("差分がないのでコードレビューできません。")
+    if not diff_text:
+        print("差分がないためレビューできません。")
         return
 
-    # 4. OpenAIへレビュー依頼
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini", 
-            messages=[
-                {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-                {
-                    "role": "user",
-                    "content": f"以下のdiffをレビューして、問題点や改善提案をコメント用に出力してください。\n{diff_text}"
-                },
-            ],
-        )
-    except Exception as e:
-        print(f"OpenAI API へのリクエストでエラーが発生しました: {e}")
-        return
+    # OpenAIでレビュー内容生成
+    review_response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
+            {
+                "role": "user",
+                "content": f"以下のコード差分をレビューし、改善提案を以下の選択肢のどれかに基づいて分類してください：\n\n"
+                           f"1. 'Comment': フィードバックを送信。\n"
+                           f"2. 'Approve': 承認します。\n"
+                           f"3. 'Request changes': 変更を要求します。\n\n"
+                           f"コード差分:\n{diff_text}",
+            },
+        ],
+    )
 
-    # ChatCompletion のレスポンスを取り出す
-    try:
-        review_comment_raw = response.choices[0].message.content
-        project_name = "🚀 **[AI Code Reviewer]**"
-        review_comment = f"{project_name}\n\n{review_comment_raw}"
-    except (IndexError, KeyError) as e:
-        print(f"ChatCompletion のレスポンスが想定外の形式です: {e}")
-        return
+    review_comment_raw = review_response.choices[0].message.content
+    action = determine_action(review_comment_raw)
 
-    # 5. pull_request の情報を event_path から取得
+    # PR情報取得
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
@@ -81,27 +60,66 @@ def main():
 
     pr_number = payload["pull_request"].get("number")
     if not pr_number:
-        print("PR番号が取得できませんでした。")
+        print("PR番号が取得できません。")
         return
 
-    # 6. PR へコメント投稿
-    post_comment_to_pr(repo, pr_number, review_comment, GITHUB_TOKEN)
+    # コメント投稿の分岐
+    if action == "Comment":
+        post_comment_to_pr(repo, pr_number, review_comment_raw, GITHUB_TOKEN)
+    elif action == "Approve":
+        approve_pr(repo, pr_number, GITHUB_TOKEN)
+    elif action == "Request changes":
+        request_changes_to_pr(repo, pr_number, review_comment_raw, GITHUB_TOKEN)
+
+
+def determine_action(comment):
+    if "承認します" in comment or "Approve" in comment:
+        return "Approve"
+    elif "変更を要求します" in comment or "Request changes" in comment:
+        return "Request changes"
+    return "Comment"
 
 
 def post_comment_to_pr(repo, pr_number, body, token):
     url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     headers = {
         "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
+        "Accept": "application/vnd.github.v3+json",
     }
     data = {"body": body}
-
     resp = requests.post(url, headers=headers, json=data)
     if resp.status_code == 201:
-        print("コメント投稿成功です！")
+        print("コメント投稿成功！")
     else:
-        print(f"コメント投稿失敗です…ステータスコード: {resp.status_code}")
-        print(resp.text)
+        print(f"コメント投稿失敗: {resp.status_code}")
+
+
+def approve_pr(repo, pr_number, token):
+    url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    data = {"event": "APPROVE"}
+    resp = requests.post(url, headers=headers, json=data)
+    if resp.status_code == 200:
+        print("PR承認成功！")
+    else:
+        print(f"PR承認失敗: {resp.status_code}")
+
+
+def request_changes_to_pr(repo, pr_number, body, token):
+    url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    data = {"body": body, "event": "REQUEST_CHANGES"}
+    resp = requests.post(url, headers=headers, json=data)
+    if resp.status_code == 200:
+        print("変更要求成功！")
+    else:
+        print(f"変更要求失敗: {resp.status_code}")
 
 
 if __name__ == "__main__":

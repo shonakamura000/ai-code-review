@@ -10,6 +10,9 @@
 
 1. **このリポジトリを公開ワークフローとして利用**
    自分のリポジトリで以下を設定してください。
+   
+   - Github ActionsのSercretsに`OPENAI_API_KEY`として、Open AIのAPI Keyを設定する
+   - 以下のファイルを/.github/workflows内に作成
 
    ```yaml
     name: Run AI Review

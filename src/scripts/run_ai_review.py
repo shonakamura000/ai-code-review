@@ -65,7 +65,7 @@ def main():
 
     # ChatCompletion のレスポンスを取り出す
     try:
-        review_comment = response.choices[0].message["content"]
+        review_comment = response.choices[0].message.content
     except (IndexError, KeyError) as e:
         print(f"ChatCompletion のレスポンスが想定外の形式です: {e}")
         return

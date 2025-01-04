@@ -7,7 +7,7 @@ on:
         required: true
 
 permissions:
-  contents: write        # コードへの読み書き権限
+  contents: write       
   pull-requests: write  
 
 jobs:
@@ -15,16 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # 1) Reusable Workflow リポジトリ (このレポ) を checkout
-      #    - ここに "scripts/run_ai_review.py" が入っている想定
       - name: Check out AI Review Script (Public repo)
         uses: actions/checkout@v3
         with:
-          repository: shonakamura000/ai-code-review  # Publicリポジトリ
+          repository: shonakamura000/ai-code-review  
           ref: main
           path: ai_review_repo
 
       # 2) Caller (ユーザ) リポジトリを checkout
-      #    - "caller" フォルダに配置することで混乱を回避
       - name: Check out caller repo
         uses: actions/checkout@v3
         with:
@@ -47,7 +45,7 @@ jobs:
       - name: Debug Secrets
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 必要なら
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
         run: |
           echo "Debugging secrets from reusable workflow..."
           if [ -z "$OPENAI_API_KEY" ]; then
@@ -56,7 +54,6 @@ jobs:
           fi
           echo "OPENAI_API_KEY is set."
 
-          # GITHUB_TOKEN をチェックしたくないなら削除
           if [ -z "$GITHUB_TOKEN" ]; then
             echo "Error: GITHUB_TOKEN is not passed."
             exit 1
@@ -77,6 +74,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Running AI Review script..."
-          # 「caller/」 ディレクトリへ移動してから Pythonを実行
           cd caller
           python ../ai_review_repo/src/scripts/run_ai_review.py

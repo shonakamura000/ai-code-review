@@ -73,7 +73,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Running AI Review script..."
-          # Reusable Workflow リポジトリにあるスクリプトを実行
-          #   → "ai_review_repo/scripts/run_ai_review.py"
-          # Caller 側のコードは "caller" 下にあるので、スクリプトで "caller" を解析する実装
-          python ai_review_repo/src/scripts/run_ai_review.py --target=caller
+          # 「caller/」 ディレクトリへ移動してから Pythonを実行
+          cd caller
+          python ../ai_review_repo/src/scripts/run_ai_review.py

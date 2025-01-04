@@ -6,6 +6,10 @@ on:
       OPENAI_API_KEY:
         required: true
 
+permissions:
+  contents: write        # コードへの読み書き権限
+  pull-requests: write  
+
 jobs:
   ai-review:
     runs-on: ubuntu-latest

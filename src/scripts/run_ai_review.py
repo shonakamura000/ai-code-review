@@ -33,7 +33,6 @@ def main():
     openai_client = OpenAI(api_key=OPENAI_API_KEY)
     
     # 3. baseブランチ(main) を fetch し、base...HEAD の差分を取得
-    #    ※ baseブランチが "main" ではない場合は適宜変更
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
 
     diff_result = subprocess.run(
@@ -50,7 +49,7 @@ def main():
     # 4. OpenAIへレビュー依頼
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",  # 例: "gpt-3.5-turbo" や "gpt-4" など
+            model="gpt-4o-mini", 
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {
@@ -65,7 +64,9 @@ def main():
 
     # ChatCompletion のレスポンスを取り出す
     try:
-        review_comment = response.choices[0].message.content
+        review_comment_raw = response.choices[0].message.content
+        project_name = "🚀 **[AI Code Reviewer]**"
+        review_comment = f"{project_name}\n\n{review_comment_raw}"
     except (IndexError, KeyError) as e:
         print(f"ChatCompletion のレスポンスが想定外の形式です: {e}")
         return
@@ -88,9 +89,6 @@ def main():
 
 
 def post_comment_to_pr(repo, pr_number, body, token):
-    """
-    指定したリポジトリ/PR番号に対して body の内容をコメント投稿する。
-    """
     url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     headers = {
         "Authorization": f"token {token}",

@@ -12,15 +12,18 @@
    自分のリポジトリで以下を設定してください。
 
    ```yaml
-   name: Run AI Review
+    name: Run AI Review
 
-   on:
-     pull_request:
-       types: [opened, synchronize]
+    on:
+    pull_request:
+        types: [opened, synchronize]
 
-   jobs:
-     ai-review:
-       uses: shonakamura000/ai-code-review/.github/workflows/ai_review.yml@main
-       with:
-         openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-         github_token: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+    contents: write
+    pull-requests: write
+
+    jobs:
+    ai-review:
+        uses: shonakamura000/ai-code-review/.github/workflows/ai_review_reusable.yml@main
+        secrets:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

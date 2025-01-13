@@ -56,12 +56,12 @@ def main():
         return
 
     # プロンプトテンプレートの読み込み
-    prompt_template_path = "../prompts/code_review_prompt.md"
+    prompt_template_path = "code_review_prompt.md"
     prompt_template = load_prompt_template(prompt_template_path)
     if not prompt_template:
         return
     
-    guidelines_path = "../doc/code_review_guidelines.md"
+    guidelines_path = "code-guidelines.md"
     code_guidelines = load_code_review_guidelines(guidelines_path)
 
     # プロンプトに差分、コード規約を埋め込む

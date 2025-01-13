@@ -47,13 +47,17 @@ def main():
     if not diff_text:
         print("差分がないためレビューできません。")
         return
+    print(f"diff_text:{diff_text}")
 
     # プロンプトテンプレートの読み込み
     prompt_template = load_file(PROMPT_TEMPLATE_PATH)
     if not prompt_template:
         return
+    print(f"prompt_template:{prompt_template}")
+
 
     code_guidelines = load_file(GUIDELINES_PATH)
+    print(f"code_guidelines:{code_guidelines}")
 
     # プロンプトに差分、コード規約を埋め込む
     prompt = prompt_template.format(diff_text=diff_text,code_guidelines=code_guidelines)

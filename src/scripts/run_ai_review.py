@@ -4,8 +4,32 @@ import os
 import json
 import subprocess
 
-from openai import OpenAI
 import requests
+from openai import OpenAI
+
+
+def load_prompt_template(file_path):
+    """
+    プロンプトテンプレートを外部ファイルから読み込む
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        print(f"プロンプトファイルが見つかりません: {file_path}")
+        return None
+
+def load_code_review_guidelines(file_path):
+    """
+    コードレビュー規約を外部ファイルから読み込む
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        print(f"コードレビュー規約ファイルが見つかりません: {file_path}")
+        return None
+
 
 def main():
     # 環境変数と設定の取得
@@ -31,24 +55,41 @@ def main():
         print("差分がないためレビューできません。")
         return
 
-    # OpenAIでレビュー分類を取得
+    # プロンプトテンプレートの読み込み
+    prompt_template_path = "../prompts/code_review_prompt.md"
+    prompt_template = load_prompt_template(prompt_template_path)
+    if not prompt_template:
+        return
+    
+    guidelines_path = "../doc/code_review_guidelines.md"
+    code_guidelines = load_code_review_guidelines(guidelines_path)
+
+    # プロンプトに差分、コード規約を埋め込む
+    prompt = prompt_template.format(diff_text=diff_text,code_tuidelines=code_guidelines)
+
+    # OpenAI API呼び出し
     review_response = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-            {
-                "role": "user",
-                "content": f"以下のコード差分をレビューし、改善提案を以下の選択肢のどれかに基づいて分類してください：\n\n"
-                           f"1. 'Comment': フィードバックを送信。\n"
-                           f"2. 'Approve': 承認します。\n"
-                           f"3. 'Request changes': 変更を要求します。\n\n"
-                           f"コード差分:\n{diff_text}",
-            },
+            {"role": "user", "content": prompt},
         ],
+        temperature=0.0,
+        max_tokens = 500
     )
 
-    review_action_raw = review_response.choices[0].message.content
-    action = determine_action(review_action_raw)
+    # JSONパース
+    try:
+        content = review_response.choices[0].message.content.strip()
+        review_json = json.loads(content)
+    except (IndexError, KeyError, json.JSONDecodeError):
+        print("API応答をJSONとして解釈できませんでした。")
+        return
+
+    # JSONに含まれる情報を取り出す
+    action = review_json.get("action", "Comment")
+    reason = review_json.get("reason", "理由が取得できませんでした。")
+    review_content = review_json.get("reviewContent", "レビュー内容が取得できませんでした。")
 
     # PR情報取得
     with open(event_path, "r", encoding="utf-8") as f:
@@ -63,10 +104,7 @@ def main():
         print("PR番号が取得できません。")
         return
 
-    # レビュー内容の生成
-    review_content = generate_review_content(openai_client, diff_text, action)
-
-    # コメント投稿の分岐
+    # 判定したアクションに応じてGitHubに反映
     if action == "Comment":
         post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     elif action == "Approve":
@@ -74,42 +112,11 @@ def main():
         post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     elif action == "Request changes":
         request_changes_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
-
-
-def generate_review_content(openai_client, diff_text, action):
-    """
-    アクションに応じてレビュー内容を生成
-    """
-    prompt = f"以下のコード差分を基に、{action}に対応する具体的なレビュー内容を生成してください。\n\nコード差分:\n{diff_text}"
-    response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-            {"role": "user", "content": prompt},
-        ],
-    )
-    try:
-        return response.choices[0].message.content
-    except (IndexError, KeyError):
-        print("レビュー内容の生成に失敗しました。")
-        return "レビュー内容の生成に失敗しました。"
-
-
-def determine_action(comment):
-    """
-    OpenAIの応答からアクションを判定
-    """
-    if "承認します" in comment or "Approve" in comment:
-        return "Approve"
-    elif "変更を要求します" in comment or "Request changes" in comment:
-        return "Request changes"
-    return "Comment"
+    else:
+        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
 
 
 def post_comment_to_pr(repo, pr_number, body, token):
-    """
-    PRにコメントを投稿
-    """
     url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     headers = {
         "Authorization": f"token {token}",
@@ -124,9 +131,6 @@ def post_comment_to_pr(repo, pr_number, body, token):
 
 
 def approve_pr(repo, pr_number, token):
-    """
-    PRを承認
-    """
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
@@ -141,9 +145,6 @@ def approve_pr(repo, pr_number, token):
 
 
 def request_changes_to_pr(repo, pr_number, body, token):
-    """
-    PRに変更要求を送信
-    """
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",

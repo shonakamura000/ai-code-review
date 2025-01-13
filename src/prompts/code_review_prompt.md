@@ -1,11 +1,18 @@
-##タスク
+## タスク
 以下のコード差分をレビューしてください。コードレビューは以下のコード規約を厳守して行い、次のフォーマットでJSONを返してください。
 
 - **action**: "Comment", "Approve", "Request changes" のいずれかを選択。
   - "Comment": コードに大きな問題はないが改善点や追加の提案がある場合。
   - "Approve": 問題がなく、そのまま承認してもよい場合。
   - "Request changes": 問題があり、修正が必要と判断される場合。
-- **reason**: 選択した action の理由を詳細に記述。
+- **reason**: 選択した action の理由を詳細に記述し、具体的に修正が必要なコード部分を提示してください
+（例:```
+# 修正前
+variableName = "value"
+
+# 修正提案
+variable_name = "value"
+```
 
 ## 入力データ
 ### コード規約
@@ -23,5 +30,13 @@
 ```json
 {{
   "action": "Comment",  
-  "reason": "ここにアクションを選んだ理由を簡潔に記述", 
+  "reason": "ここにアクションを選んだ理由を具体的に記述し、修正が必要なコード部分を提示してください。例えば：
+
+  ```python
+  # 修正前
+  variableName = \"value\"
+
+  # 修正提案
+  variable_name = \"value\"
+  ```"
 }}

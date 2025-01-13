@@ -3,33 +3,26 @@
 import os
 import json
 import subprocess
-
+from pathlib import Path
 import requests
 from openai import OpenAI
 
 
-def load_prompt_template(file_path):
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+print(f"PROJECT_ROOT:{PROJECT_ROOT}")
+PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "src/prompts/code_review_prompt.md"
+GUIDELINES_PATH = PROJECT_ROOT / "src/doc/code-guidelines.md"
+
+def load_file(file_path):
     """
-    プロンプトテンプレートを外部ファイルから読み込む
+    ファイルを読み込む汎用関数
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        print(f"プロンプトファイルが見つかりません: {file_path}")
+        print(f"ファイルが見つかりません: {file_path}")
         return None
-
-def load_code_review_guidelines(file_path):
-    """
-    コードレビュー規約を外部ファイルから読み込む
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        print(f"コードレビュー規約ファイルが見つかりません: {file_path}")
-        return None
-
 
 def main():
     # 環境変数と設定の取得
@@ -56,13 +49,11 @@ def main():
         return
 
     # プロンプトテンプレートの読み込み
-    prompt_template_path = "code_review_prompt.md"
-    prompt_template = load_prompt_template(prompt_template_path)
+    prompt_template = load_file(PROMPT_TEMPLATE_PATH)
     if not prompt_template:
         return
-    
-    guidelines_path = "code-guidelines.md"
-    code_guidelines = load_code_review_guidelines(guidelines_path)
+
+    code_guidelines = load_file(GUIDELINES_PATH)
 
     # プロンプトに差分、コード規約を埋め込む
     prompt = prompt_template.format(diff_text=diff_text,code_tuidelines=code_guidelines)

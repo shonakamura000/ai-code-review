@@ -61,7 +61,7 @@ def main():
     if not prompt_template:
         return
     
-    guidelines_path = "../prompts/code_review_guidelines.md"
+    guidelines_path = "../doc/code_review_guidelines.md"
     code_guidelines = load_code_review_guidelines(guidelines_path)
 
     # プロンプトに差分、コード規約を埋め込む

@@ -57,7 +57,7 @@ def main():
 
 
     code_guidelines = load_file(GUIDELINES_PATH)
-    print(f"code_guidelines:{code_guidelines}")
+    print(f"code_guidelines:{prompt_template}")
 
     # プロンプトに差分、コード規約を埋め込む
     prompt = prompt_template.format(diff_text=diff_text,code_guidelines=code_guidelines)
@@ -71,7 +71,8 @@ def main():
             {"role": "user", "content": prompt},
         ],
         temperature=0.0,
-        max_tokens = 500
+        max_tokens = 500,
+        response_format={"type": "json_object"}
     )
     print(f"review_response:{review_response}")
 

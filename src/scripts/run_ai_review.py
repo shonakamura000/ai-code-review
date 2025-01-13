@@ -87,7 +87,7 @@ def main():
     # JSONに含まれる情報を取り出す
     action = review_json.get("action", "Comment")
     reason = review_json.get("reason", "理由が取得できませんでした。")
-    review_content = review_json.get("reviewContent", "レビュー内容が取得できませんでした。")
+
 
     # PR情報取得
     with open(event_path, "r", encoding="utf-8") as f:
@@ -104,14 +104,14 @@ def main():
 
     # 判定したアクションに応じてGitHubに反映
     if action == "Comment":
-        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
     elif action == "Approve":
         approve_pr(repo, pr_number, GITHUB_TOKEN)
-        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
     elif action == "Request changes":
-        request_changes_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
+        request_changes_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
     else:
-        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
 
 
 def post_comment_to_pr(repo, pr_number, body, token):

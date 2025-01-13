@@ -68,6 +68,7 @@ def main():
         temperature=0.0,
         max_tokens = 500
     )
+    print(f"review_response:{review_response}")
 
     # JSONパース
     try:

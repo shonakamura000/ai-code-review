@@ -10,8 +10,8 @@ from openai import OpenAI
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 print(f"PROJECT_ROOT:{PROJECT_ROOT}")
-PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "src/prompts/code_review_prompt.md"
-GUIDELINES_PATH = PROJECT_ROOT / "src/doc/code-guidelines.md"
+PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts/code_review_prompt.md"
+GUIDELINES_PATH = PROJECT_ROOT / "doc/code-guidelines.md"
 
 def load_file(file_path):
     """

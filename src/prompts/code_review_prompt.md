@@ -24,5 +24,4 @@
 {
   "action": "Comment",  // "Approve" または "Request changes" のいずれか
   "reason": "ここにアクションを選んだ理由を簡潔に記述", 
-  "reviewContent": "ここに具体的なレビューコメントを記述"
 }

@@ -57,6 +57,7 @@ def main():
 
     # プロンプトに差分、コード規約を埋め込む
     prompt = prompt_template.format(diff_text=diff_text,code_guidelines=code_guidelines)
+    print(f"prompt:{prompt}")
 
     # OpenAI API呼び出し
     review_response = openai_client.chat.completions.create(

@@ -6,13 +6,13 @@ import subprocess
 from pathlib import Path
 import requests
 import openai  # OpenAI をインポート
-from llama_index.core import VectorStoreIndex as GPTSimpleVectorIndex
+from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
 
 # 定数の定義
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts/code_review_prompt.md"
 GUIDELINES_PATH = PROJECT_ROOT / "doc/code-guidelines.md"
-INDEX_PATH = PROJECT_ROOT / "indexes/code_guidelines_index.json"
+INDEX_PATH = PROJECT_ROOT / "indexes"
 
 def load_file(file_path):
     """
@@ -30,11 +30,12 @@ def load_index():
     LlamaIndex のインデックスをロードする関数
     """
     try:
-        index = GPTSimpleVectorIndex.load_from_disk(str(INDEX_PATH))
+        storage_context = StorageContext.from_defaults(persist_dir=str(INDEX_PATH))
+        index = load_index_from_storage(storage_context)
         print("LlamaIndex のインデックスをロードしました。")
         return index
-    except FileNotFoundError:
-        print(f"インデックスファイルが見つかりません: {INDEX_PATH}")
+    except Exception as e:
+        print(f"インデックスのロード中にエラーが発生しました: {e}")
         return None
 
 def main():

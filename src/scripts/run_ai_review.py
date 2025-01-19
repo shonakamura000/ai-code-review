@@ -5,7 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 import requests
-import openai  # OpenAI をインポート
+from openai import OpenAI
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
 
 # 定数の定義
@@ -50,7 +50,7 @@ def main():
         return
 
     # OpenAI クライアントの設定
-    openai.api_key = OPENAI_API_KEY
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
     # PR 差分の取得
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
@@ -95,8 +95,8 @@ def main():
 
     # OpenAI API 呼び出し
     try:
-        review_response = openai.ChatCompletion.create(
-            model="gpt-4",
+        review_response = client.chat.completions.create(
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {"role": "user", "content": prompt},

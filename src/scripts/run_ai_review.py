@@ -1,17 +1,18 @@
-# ファイル例: scripts/run_ai_review.py
+# scripts/run_ai_review.py
 
 import os
 import json
 import subprocess
 from pathlib import Path
 import requests
-from openai import OpenAI
+import openai  # OpenAI をインポート
+from llama_index import GPTSimpleVectorIndex
 
-
+# 定数の定義
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-print(f"PROJECT_ROOT:{PROJECT_ROOT}")
 PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts/code_review_prompt.md"
 GUIDELINES_PATH = PROJECT_ROOT / "doc/code-guidelines.md"
+INDEX_PATH = PROJECT_ROOT / "indexes/code_guidelines_index.json"
 
 def load_file(file_path):
     """
@@ -22,6 +23,18 @@ def load_file(file_path):
             return f.read()
     except FileNotFoundError:
         print(f"ファイルが見つかりません: {file_path}")
+        return None
+
+def load_index():
+    """
+    LlamaIndex のインデックスをロードする関数
+    """
+    try:
+        index = GPTSimpleVectorIndex.load_from_disk(str(INDEX_PATH))
+        print("LlamaIndex のインデックスをロードしました。")
+        return index
+    except FileNotFoundError:
+        print(f"インデックスファイルが見つかりません: {INDEX_PATH}")
         return None
 
 def main():
@@ -35,9 +48,10 @@ def main():
         print("必要な環境変数が設定されていません。")
         return
 
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    # OpenAI クライアントの設定
+    openai.api_key = OPENAI_API_KEY
 
-    # PR差分の取得
+    # PR 差分の取得
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
     diff_result = subprocess.run(
         ["git", "diff", "origin/main...HEAD"], capture_output=True, text=True
@@ -47,49 +61,65 @@ def main():
     if not diff_text:
         print("差分がないためレビューできません。")
         return
-    print(f"diff_text:{diff_text}")
+    print(f"diff_text:\n{diff_text}")
 
     # プロンプトテンプレートの読み込み
     prompt_template = load_file(PROMPT_TEMPLATE_PATH)
     if not prompt_template:
         return
-    print(f"prompt_template:{prompt_template}")
+    print(f"prompt_template:\n{prompt_template}")
 
+    # LlamaIndex のインデックスをロード
+    index = load_index()
+    if not index:
+        return
 
-    code_guidelines = load_file(GUIDELINES_PATH)
-    print(f"code_guidelines:{prompt_template}")
+    # RAG: 差分テキストを基に関連するコードガイドラインを取得
+    try:
+        # 差分に基づいたクエリの定義
+        query = f"以下のPR差分に関連するコードガイドラインを提供してください:\n{diff_text}"
+        response = index.query(query, response_mode="compact")
+        retrieved_guidelines = response.response
+        print(f"retrieved_guidelines:\n{retrieved_guidelines}")
+    except Exception as e:
+        print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
+        return
 
-    # プロンプトに差分、コード規約を埋め込む
-    prompt = prompt_template.format(diff_text=diff_text,code_guidelines=code_guidelines)
-    print(f"prompt:{prompt}")
+    # プロンプトに差分、取得したコード規約を埋め込む
+    prompt = prompt_template.format(diff_text=diff_text, code_guidelines=retrieved_guidelines)
+    print(f"prompt:\n{prompt}")
 
-    # OpenAI API呼び出し
-    review_response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.0,
-        max_tokens = 500,
-        response_format={"type": "json_object"}
-    )
-    print(f"review_response:{review_response}")
+    # OpenAI API 呼び出し
+    try:
+        review_response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=500,
+            response_format={"type": "json_object"}  
+        )
+        print(f"review_response:\n{review_response}")
+    except Exception as e:
+        print(f"OpenAI API 呼び出し中にエラーが発生しました: {e}")
+        return
 
-    # JSONパース
+    # JSON パース
     try:
         content = review_response.choices[0].message.content.strip()
         review_json = json.loads(content)
-    except (IndexError, KeyError, json.JSONDecodeError):
-        print("API応答をJSONとして解釈できませんでした。")
+    except (IndexError, KeyError, json.JSONDecodeError) as e:
+        print(f"API 応答を JSON として解釈できませんでした: {e}")
+        print(f"応答内容: {review_response}")
         return
 
-    # JSONに含まれる情報を取り出す
+    # JSON に含まれる情報を取り出す
     action = review_json.get("action", "Comment")
     reason = review_json.get("reason", "理由が取得できませんでした。")
 
-
-    # PR情報取得
+    # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
@@ -102,7 +132,7 @@ def main():
         print("PR番号が取得できません。")
         return
 
-    # 判定したアクションに応じてGitHubに反映
+    # 判定したアクションに応じて GitHub に反映
     if action == "Comment":
         post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
     elif action == "Approve":
@@ -112,7 +142,6 @@ def main():
         request_changes_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
     else:
         post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
-
 
 def post_comment_to_pr(repo, pr_number, body, token):
     url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
@@ -125,8 +154,7 @@ def post_comment_to_pr(repo, pr_number, body, token):
     if resp.status_code == 201:
         print("コメント投稿成功！")
     else:
-        print(f"コメント投稿失敗: {resp.status_code}")
-
+        print(f"コメント投稿失敗: {resp.status_code} - {resp.text}")
 
 def approve_pr(repo, pr_number, token):
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
@@ -139,8 +167,7 @@ def approve_pr(repo, pr_number, token):
     if resp.status_code == 200:
         print("PR承認成功！")
     else:
-        print(f"PR承認失敗: {resp.status_code}")
-
+        print(f"PR承認失敗: {resp.status_code} - {resp.text}")
 
 def request_changes_to_pr(repo, pr_number, body, token):
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
@@ -153,8 +180,7 @@ def request_changes_to_pr(repo, pr_number, body, token):
     if resp.status_code == 200:
         print("変更要求成功！")
     else:
-        print(f"変更要求失敗: {resp.status_code}")
-
+        print(f"変更要求失敗: {resp.status_code} - {resp.text}")
 
 if __name__ == "__main__":
     main()

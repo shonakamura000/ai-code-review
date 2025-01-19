@@ -62,7 +62,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install openai requests
+          pip install openai requests llama-index
 
       - name: Verify Python Packages
         run: |

@@ -77,10 +77,13 @@ def main():
 
     # RAG: 差分テキストを基に関連するコードガイドラインを取得
     try:
+    # クエリエンジンの作成
+        query_engine = index.as_query_engine()
+        
         # 差分に基づいたクエリの定義
         query = f"以下のPR差分に関連するコードガイドラインを提供してください:\n{diff_text}"
-        response = index.query(query, response_mode="compact")
-        retrieved_guidelines = response.response
+        response = query_engine.query(query)
+        retrieved_guidelines = str(response)
         print(f"retrieved_guidelines:\n{retrieved_guidelines}")
     except Exception as e:
         print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")

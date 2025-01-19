@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 import requests
 import openai  # OpenAI をインポート
-from llama_index import GPTSimpleVectorIndex
+from llama_index.core import VectorStoreIndex as GPTSimpleVectorIndex
 
 # 定数の定義
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

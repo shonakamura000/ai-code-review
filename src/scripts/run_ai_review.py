@@ -14,6 +14,7 @@ import re
 # 定数の定義
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts/code_review_prompt.md"
+PROMPT_CLASSIFICATION_PATH = PROJECT_ROOT / "prompts/classification_prompt.md"
 GUIDELINES_PATH = PROJECT_ROOT / "doc/code-guidelines.md"
 INDEX_PATH = PROJECT_ROOT / "indexes"
 
@@ -78,6 +79,61 @@ def split_diff_by_file(diff_text):
         file_diffs[current_file] = "\n".join(current_lines)
 
     return file_diffs
+
+def generate_review(client, prompt):
+    """
+    レビュー内容を生成する関数
+    """
+    try:
+        review_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=800,
+        )
+        print(f"review_response:\n{review_response}")
+        content = review_response.choices[0].message.content.strip()
+        print(f"content: {content}")
+
+        # コードブロックからレビュー理由を抽出
+        json_match = re.search(r"```json\n(.*?)\n```", content, re.DOTALL)
+        if json_match:
+            review_json = json.loads(json_match.group(1))
+            return review_json.get("reason", "レビュー内容が取得できませんでした。")
+        else:
+            return content  # JSON でない場合はそのまま返す
+    except Exception as e:
+        print(f"レビュー生成中にエラーが発生しました: {e}")
+        return "レビューの生成に失敗しました。"
+    
+
+def determine_action(client, review_content):
+    """
+    レビュー内容を基にアクションを判断する関数
+    """
+    try:
+        action_prompt =  load_file(PROMPT_CLASSIFICATION_PATH).format(review_content=review_content)
+
+        action_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
+                {"role": "user", "content": action_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=100,
+        )
+        print(f"action_response:\n{action_response}")
+        action_content = action_response.choices[0].message.content.strip()
+
+        return action_content
+    except Exception as e:
+        print(f"アクション判定中にエラーが発生しました: {e}")
+        return "Comment"
+
 
 def main():
     # 環境変数と設定の取得
@@ -159,39 +215,15 @@ def main():
     print(f"prompt:\n{prompt}")
 
     # OpenAI API 呼び出し
-    try:
-        review_response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-            max_tokens=800 
-        )
-        print(f"review_response:\n{review_response}")
-    except Exception as e:
-        print(f"OpenAI API 呼び出し中にエラーが発生しました: {e}")
+    review_content = generate_review(client, prompt)
+    if not review_content:
+        print("レビューの生成に失敗しました。")
         return
 
     # JSON パース
-    try:
-        content = review_response.choices[0].message.content.strip()
-        print(f"content:{content}")
-        content_dict = json.loads(content) 
-        print(f"content_dict:{content_dict}")
-    except (IndexError, KeyError, json.JSONDecodeError) as e:
-        print(f"API 応答を JSON として解釈できませんでした: {e}")
-        print(f"応答内容: {review_response}")
-        return
+    action = determine_action(client, review_content)
+    print(f"アクション: {action}\nレビュー内容: {review_content}")
 
-    # JSON に含まれる情報を取り出す
-    try:
-        action = content_dict.get("action", "Comment")
-        reason = content_dict.get("reason", "理由が取得できませんでした。")
-    except Exception as e:
-        print(f"Jsonからの情報取得中にエラーが起こりました: {e}")
-        return
 
     # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:
@@ -208,14 +240,14 @@ def main():
 
     # 判定したアクションに応じて GitHub に反映
     if action == "Comment":
-        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     elif action == "Approve":
         approve_pr(repo, pr_number, GITHUB_TOKEN)
-        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     elif action == "Request changes":
-        request_changes_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
+        request_changes_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     else:
-        post_comment_to_pr(repo, pr_number, reason, GITHUB_TOKEN)
+        post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
 
 def post_comment_to_pr(repo, pr_number, body, token):
     url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"

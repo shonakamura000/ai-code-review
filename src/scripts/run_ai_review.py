@@ -85,7 +85,7 @@ def generate_review(client, prompt):
     """
     try:
         review_response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {"role": "user", "content": prompt},
@@ -113,7 +113,7 @@ def determine_action(client, review_content):
         action_prompt = load_file(PROMPT_CLASSIFICATION_PATH).format(review_content=review_content)
 
         action_response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {"role": "user", "content": action_prompt},

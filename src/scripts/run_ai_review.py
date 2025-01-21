@@ -48,8 +48,6 @@ def split_diff_by_file(diff_text):
     戻り値は {ファイルパス: そのファイルのdiff} の辞書を想定。
     """
     file_diffs = {}
-    # diffセパレータっぽい正規表現で分割する
-    # 例: diff --git a/path/to/file b/path/to/file
     pattern = r"^diff --git a/(.+?) b/\1"
     lines = diff_text.splitlines()
     
@@ -58,8 +56,6 @@ def split_diff_by_file(diff_text):
     
     for line in lines:
         if line.startswith("diff --git a/"):
-            # 新しいファイルdiffの開始
-            # これまでのファイルを登録
             if current_file and current_lines:
                 file_diffs[current_file] = "\n".join(current_lines)
             match = re.match(r"^diff --git a/(.+?) b/(.+)$", line)
@@ -197,7 +193,6 @@ def main():
                 code_guidelines=retrieved_guidelines
             )
             file_review = generate_review(client, prompt)
-            # ガイドラインとは別にレビューのみを保存
             file_reviews_map[filename] = file_review
 
         except Exception as e:
@@ -209,12 +204,9 @@ def main():
     for filename, review_text in file_reviews_map.items():
         review_content += f"\n### {filename}\n{review_text}\n"
 
-    # JSON パース
     action = determine_action(client, review_content)
     print(f"アクション: {action}\nレビュー内容: {review_content}")
 
-
-    # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 

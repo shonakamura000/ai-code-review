@@ -183,8 +183,12 @@ def main():
         return
 
     # JSON に含まれる情報を取り出す
-    action = content.get("action", "Comment")
-    reason = content.get("reason", "理由が取得できませんでした。")
+    try:
+        action = content.get("action", "Comment")
+        reason = content.get("reason", "理由が取得できませんでした。")
+    except Exception as e:
+        print(f"Jsonからの情報取得中にエラーが起こりました: {e}")
+        return
 
     # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:

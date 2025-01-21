@@ -177,6 +177,7 @@ def main():
     # JSON パース
     try:
         content = review_response.choices[0].message.content.strip()
+        print(f"content:{content}")
     except (IndexError, KeyError, json.JSONDecodeError) as e:
         print(f"API 応答を JSON として解釈できませんでした: {e}")
         print(f"応答内容: {review_response}")

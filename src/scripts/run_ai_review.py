@@ -97,14 +97,7 @@ def generate_review(client, prompt):
         print(f"review_response:\n{review_response}")
         content = review_response.choices[0].message.content.strip()
         print(f"content: {content}")
-
-        # コードブロックからレビュー理由を抽出
-        json_match = re.search(r"```json\n(.*?)\n```", content, re.DOTALL)
-        if json_match:
-            review_json = json.loads(json_match.group(1))
-            return review_json.get("reason", "レビュー内容が取得できませんでした。")
-        else:
-            return content  # JSON でない場合はそのまま返す
+        return content
     except Exception as e:
         print(f"レビュー生成中にエラーが発生しました: {e}")
         return "レビューの生成に失敗しました。"

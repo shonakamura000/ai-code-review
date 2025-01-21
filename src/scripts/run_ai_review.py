@@ -41,6 +41,37 @@ def load_index():
         print(f"インデックスのロード中にエラーが発生しました: {e}")
         return None
 
+def extract_code_blocks(raw_content):
+    """
+    バッククオートで囲まれたコードブロックをすべて抽出する関数
+    """
+    # バッククオートで囲まれたコードブロックをすべて抽出
+    code_blocks = re.findall(r"```json\n(.*?)\n```", raw_content, re.DOTALL)
+    return code_blocks
+
+def process_code_blocks(code_blocks):
+    """
+    各コードブロックを処理し、JSON として解釈する関数
+    """
+    extracted_jsons = []
+    for idx, block in enumerate(code_blocks):
+        try:
+            # JSON パースを試みる
+            parsed_json = json.loads(block)
+            extracted_jsons.append(parsed_json)
+            print(f"コードブロック {idx + 1} の JSON:\n{parsed_json}")
+        except json.JSONDecodeError as e:
+            print(f"コードブロック {idx + 1} の JSON パースに失敗しました: {e}")
+            print(f"未処理の内容:\n{block}")
+    return extracted_jsons
+
+def handle_no_code_blocks(raw_content):
+    """
+    コードブロックが見つからない場合に非構造化テキストを処理する関数
+    """
+    print("コードブロックが見つかりませんでした。内容をそのまま出力します：")
+    print(raw_content)
+
 def split_diff_by_file(diff_text):
     """
     git diff テキストをファイル単位に分割して返す関数。
@@ -177,15 +208,23 @@ def main():
     # JSON パース
     try:
         content = review_response.choices[0].message.content.strip()
-        review_json = json.loads(content)
+        code_blocks = extract_code_blocks(content)
+        if not code_blocks:
+            handle_no_code_blocks(content)  
+            return
+
+        extracted_jsons = process_code_blocks(code_blocks)
+
+        for idx, json_data in enumerate(extracted_jsons):
+            action = json_data.get("action", "Comment")
+            reason = json_data.get("reason", "理由が取得できませんでした。")
+            print(f"コードブロック {idx + 1} のアクション: {action}")
+            print(f"理由: {reason}")
+
     except (IndexError, KeyError, json.JSONDecodeError) as e:
         print(f"API 応答を JSON として解釈できませんでした: {e}")
         print(f"応答内容: {review_response}")
         return
-
-    # JSON に含まれる情報を取り出す
-    action = review_json.get("action", "Comment")
-    reason = review_json.get("reason", "理由が取得できませんでした。")
 
     # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:

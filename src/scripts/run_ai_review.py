@@ -92,6 +92,12 @@ def generate_review(client, prompt):
         )
         print(f"review_response:\n{review_response}")
         content = review_response.choices[0].message.content.strip()
+        # トークン数の表示
+        if hasattr(review_response, "usage"):
+            usage_info = review_response.usage
+            print(f"Prompt Tokens: {usage_info.prompt_tokens}, "
+                  f"Completion Tokens: {usage_info.completion_tokens}, "
+                  f"Total Tokens: {usage_info.total_tokens}")
         print(f"content: {content}")
         return content
     except Exception as e:
@@ -104,7 +110,7 @@ def determine_action(client, review_content):
     レビュー内容を基にアクションを判断する関数
     """
     try:
-        action_prompt =  load_file(PROMPT_CLASSIFICATION_PATH).format(review_content=review_content)
+        action_prompt = load_file(PROMPT_CLASSIFICATION_PATH).format(review_content=review_content)
 
         action_response = client.chat.completions.create(
             model="gpt-4o",
@@ -117,6 +123,13 @@ def determine_action(client, review_content):
         )
         print(f"action_response:\n{action_response}")
         action_content = action_response.choices[0].message.content.strip()
+
+        # トークン数の表示
+        if hasattr(action_response, "usage"):
+            usage_info = action_response.usage
+            print(f"Prompt Tokens: {usage_info.prompt_tokens}, "
+                  f"Completion Tokens: {usage_info.completion_tokens}, "
+                  f"Total Tokens: {usage_info.total_tokens}")
 
         return action_content
     except Exception as e:
@@ -151,9 +164,14 @@ def main():
     # OpenAI クライアントの設定
     client = OpenAI(api_key=OPENAI_API_KEY)
 
+    # mainブランチの最新をfetch
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
+
+    # diff取得時にコンテキスト行を増やす (--unified=10 なら前後10行)
+    # Uオプションを増やせば増やすほど周辺行数が多くなるで
     diff_result = subprocess.run(
-        ["git", "diff", "origin/main...HEAD"], capture_output=True, text=True
+        ["git", "diff", "origin/main...HEAD", "--unified=10"],
+        capture_output=True, text=True
     )
     raw_diff_text = diff_result.stdout.strip()
 
@@ -164,8 +182,8 @@ def main():
     # フィルタリングして削除行(-)は除外
     filtered_diff_text = filter_diff_lines(raw_diff_text)
 
+    # ファイル単位に分割
     file_diff_map = split_diff_by_file(filtered_diff_text)
-
     if not file_diff_map:
         print("ファイル単位のdiffに分割できませんでした。")
         return
@@ -181,16 +199,15 @@ def main():
     if not index:
         return
 
-    # LLMまわりの設定
+    # LLMの設定
     Settings.llm = LlamaOpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
     Settings.chunk_size = 1024
-
     query_engine = index.as_query_engine()
 
-    # ファイルごとに関連するガイドラインを取得して、結果をまとめる
     file_guidelines_map = {}
     file_reviews_map = {}
 
+    # ファイルごとにガイドライン検索＋レビュー生成
     for filename, filediff in file_diff_map.items():
         query = (
             f"以下はファイル '{filename}' の差分です。"
@@ -202,7 +219,6 @@ def main():
             retrieved_guidelines = str(response)
             file_guidelines_map[filename] = retrieved_guidelines
 
-            # ファイルごとにプロンプトを作成しレビュー生成
             prompt = prompt_template.format(
                 diff_text=filediff,
                 code_guidelines=retrieved_guidelines
@@ -234,7 +250,7 @@ def main():
         print("PR番号が取得できません。")
         return
 
-    # 判定したアクションに応じて GitHub に反映
+    # 判定結果に応じてPRに反映
     if action == "Comment":
         post_comment_to_pr(repo, pr_number, review_content, GITHUB_TOKEN)
     elif action == "Approve":

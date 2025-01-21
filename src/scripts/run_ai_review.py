@@ -8,6 +8,7 @@ import requests
 from openai import OpenAI
 from llama_index.core import StorageContext, load_index_from_storage
 from llama_index.core import Settings
+from llama_index.llms import OpenAI as LlamaOpenAI
 import re
 
 # 定数の定義
@@ -121,7 +122,7 @@ def main():
         return
 
     # LLMまわりの設定
-    Settings.llm = OpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
+    Settings.llm = LlamaOpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
     Settings.chunk_size = 1024
 
     query_engine = index.as_query_engine()

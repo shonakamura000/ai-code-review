@@ -6,7 +6,9 @@ import subprocess
 from pathlib import Path
 import requests
 from openai import OpenAI
-from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
+from llama_index import ServiceContext, StorageContext, load_index_from_storage
+from llama_index.llm_predictor import LLMPredictor
+import re
 
 # 定数の定義
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +40,44 @@ def load_index():
         print(f"インデックスのロード中にエラーが発生しました: {e}")
         return None
 
+def split_diff_by_file(diff_text):
+    """
+    git diff テキストをファイル単位に分割して返す関数。
+    戻り値は {ファイルパス: そのファイルのdiff} の辞書を想定。
+    """
+    file_diffs = {}
+    # diffセパレータっぽい正規表現で分割する
+    # 例: diff --git a/path/to/file b/path/to/file
+    pattern = r"^diff --git a/(.+?) b/\1"
+    lines = diff_text.splitlines()
+    
+    current_file = None
+    current_lines = []
+    
+    for line in lines:
+        if line.startswith("diff --git a/"):
+            # 新しいファイルdiffの開始
+            # これまでのファイルを登録
+            if current_file and current_lines:
+                file_diffs[current_file] = "\n".join(current_lines)
+            match = re.match(r"^diff --git a/(.+?) b/(.+)$", line)
+            if match:
+                filename = match.group(1)
+                current_file = filename
+                current_lines = [line]
+            else:
+                current_file = None
+                current_lines = []
+        else:
+            if current_file is not None:
+                current_lines.append(line)
+
+    # 最後のファイルを登録
+    if current_file and current_lines:
+        file_diffs[current_file] = "\n".join(current_lines)
+
+    return file_diffs
+
 def main():
     # 環境変数と設定の取得
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -52,7 +92,6 @@ def main():
     # OpenAI クライアントの設定
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # PR 差分の取得
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
     diff_result = subprocess.run(
         ["git", "diff", "origin/main...HEAD"], capture_output=True, text=True
@@ -62,7 +101,13 @@ def main():
     if not diff_text:
         print("差分がないためレビューできません。")
         return
-    print(f"diff_text:\n{diff_text}")
+    print(f"diff_text:\n{diff_text[:1000]}...") 
+
+    # diffをファイル単位に分割
+    file_diff_map = split_diff_by_file(diff_text)
+    if not file_diff_map:
+        print("ファイル単位のdiffに分割できませんでした。")
+        return
 
     # プロンプトテンプレートの読み込み
     prompt_template = load_file(PROMPT_TEMPLATE_PATH)
@@ -75,22 +120,43 @@ def main():
     if not index:
         return
 
-    # RAG: 差分テキストを基に関連するコードガイドラインを取得
-    try:
-    # クエリエンジンの作成
-        query_engine = index.as_query_engine()
-        
-        # 差分に基づいたクエリの定義
-        query = f"以下のPR差分に関連するコードガイドラインを提供してください:\n{diff_text}"
-        response = query_engine.query(query)
-        retrieved_guidelines = str(response)
-        print(f"retrieved_guidelines:\n{retrieved_guidelines}")
-    except Exception as e:
-        print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
-        return
+    # LLMまわりの設定
+    llm_predictor = LLMPredictor(
+        llm=OpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
+    )
+    service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, chunk_size_limit=1024)
 
-    # プロンプトに差分、取得したコード規約を埋め込む
-    prompt = prompt_template.format(diff_text=diff_text, code_guidelines=retrieved_guidelines)
+    query_engine = index.as_query_engine(service_context=service_context)
+
+    # ファイルごとに関連するガイドラインを取得して、結果をまとめる
+    file_guidelines_map = {}
+
+    for filename, filediff in file_diff_map.items():
+        # ファイルの差分をRAGにかける
+        query = (
+            f"以下はファイル '{filename}' の差分です。"
+            "これに関連するコードガイドラインを教えてください:\n"
+            f"{filediff}"
+        )
+        try:
+            response = query_engine.query(query)
+            retrieved_guidelines = str(response)
+            file_guidelines_map[filename] = retrieved_guidelines
+        except Exception as e:
+            print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
+            file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
+
+    # ファイルごとのガイドライン情報をまとめて1つのコメントにする
+    combined_guidelines = ""
+    for filename, guidelines in file_guidelines_map.items():
+        combined_guidelines += f"\n### {filename}\n{guidelines}\n"
+
+    # プロンプトに差分全体や取得したコード規約を埋め込む
+    # 今回はファイル単位のガイドライン結果をまとめたものを使う
+    prompt = prompt_template.format(
+        diff_text=diff_text[:2000] + "...(省略)",  
+        code_guidelines=combined_guidelines
+    )
     print(f"prompt:\n{prompt}")
 
     # OpenAI API 呼び出し
@@ -102,8 +168,7 @@ def main():
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=500,
-            response_format={"type": "json_object"}  
+            max_tokens=800  # 適当に制限する
         )
         print(f"review_response:\n{review_response}")
     except Exception as e:

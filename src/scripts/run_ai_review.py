@@ -79,10 +79,13 @@ def split_diff_by_file(diff_text):
 def generate_review(client, prompt):
     """
     レビュー内容を生成する関数
+    Returns:
+        content (str): レビュー内容
+        usage (dict): トークン使用情報
     """
     try:
         review_response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {"role": "user", "content": prompt},
@@ -92,28 +95,25 @@ def generate_review(client, prompt):
         )
         print(f"review_response:\n{review_response}")
         content = review_response.choices[0].message.content.strip()
-        # トークン数の表示
-        if hasattr(review_response, "usage"):
-            usage_info = review_response.usage
-            print(f"Prompt Tokens: {usage_info.prompt_tokens}, "
-                  f"Completion Tokens: {usage_info.completion_tokens}, "
-                  f"Total Tokens: {usage_info.total_tokens}")
+        usage = review_response.usage if hasattr(review_response, "usage") else None
         print(f"content: {content}")
-        return content
+        return content, usage
     except Exception as e:
         print(f"レビュー生成中にエラーが発生しました: {e}")
-        return "レビューの生成に失敗しました。"
-    
+        return "レビューの生成に失敗しました。", None
 
 def determine_action(client, review_content):
     """
     レビュー内容を基にアクションを判断する関数
+    Returns:
+        action_content (str): 判定結果
+        usage (dict): トークン使用情報
     """
     try:
         action_prompt = load_file(PROMPT_CLASSIFICATION_PATH).format(review_content=review_content)
 
         action_response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "あなたは優秀なコードレビュアーです。"},
                 {"role": "user", "content": action_prompt},
@@ -123,18 +123,12 @@ def determine_action(client, review_content):
         )
         print(f"action_response:\n{action_response}")
         action_content = action_response.choices[0].message.content.strip()
-
-        # トークン数の表示
-        if hasattr(action_response, "usage"):
-            usage_info = action_response.usage
-            print(f"Prompt Tokens: {usage_info.prompt_tokens}, "
-                  f"Completion Tokens: {usage_info.completion_tokens}, "
-                  f"Total Tokens: {usage_info.total_tokens}")
-
-        return action_content
+        usage = action_response.usage if hasattr(action_response, "usage") else None
+        print(f"action_content: {action_content}")
+        return action_content, usage
     except Exception as e:
         print(f"アクション判定中にエラーが発生しました: {e}")
-        return "Comment"
+        return "Comment", None
 
 def filter_diff_lines(diff_text):
     filtered_lines = []
@@ -151,6 +145,11 @@ def filter_diff_lines(diff_text):
     return "\n".join(filtered_lines)
 
 def main():
+    # トークン集計用変数の初期化
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_tokens = 0
+
     # 環境変数と設定の取得
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
@@ -168,7 +167,6 @@ def main():
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
 
     # diff取得時にコンテキスト行を増やす (--unified=10 なら前後10行)
-    # Uオプションを増やせば増やすほど周辺行数が多くなるで
     diff_result = subprocess.run(
         ["git", "diff", "origin/main...HEAD", "--unified=10"],
         capture_output=True, text=True
@@ -217,6 +215,16 @@ def main():
         )
         try:
             response = query_engine.query(query)
+
+            if hasattr(response, "usage"):
+                tokens_used = response.usage.total_tokens
+                total_tokens += tokens_used
+                total_input_tokens += response.usage.prompt_tokens
+                total_output_tokens += response.usage.completion_tokens
+                print(f"ファイル '{filename}' のトークン使用量: {response.usage.prompt_tokens} (IN), {response.usage.completion_tokens} (OUT), {tokens_used} (TOTAL)")
+            else:
+                print(f"トークン使用量を取得できませんでした: {filename}")
+
             retrieved_guidelines = str(response)
             file_guidelines_map[filename] = retrieved_guidelines
 
@@ -224,8 +232,13 @@ def main():
                 diff_text=filediff,
                 code_guidelines=retrieved_guidelines
             )
-            file_review = generate_review(client, prompt)
+            file_review, usage = generate_review(client, prompt)
             file_reviews_map[filename] = file_review
+
+            if usage:
+                total_input_tokens += usage.prompt_tokens
+                total_output_tokens += usage.completion_tokens
+                total_tokens += usage.total_tokens
 
         except Exception as e:
             print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
@@ -236,8 +249,13 @@ def main():
     for filename, review_text in file_reviews_map.items():
         review_content += f"\n### {filename}\n{review_text}\n"
 
-    action = determine_action(client, review_content)
+    action, action_usage = determine_action(client, review_content)
     print(f"アクション: {action}\nレビュー内容: {review_content}")
+
+    if action_usage:
+        total_input_tokens += action_usage.prompt_tokens
+        total_output_tokens += action_usage.completion_tokens
+        total_tokens += action_usage.total_tokens
 
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
@@ -250,6 +268,13 @@ def main():
     if not pr_number:
         print("PR番号が取得できません。")
         return
+
+    # トークン使用量の合計を出力
+    print("\n===== トークン使用量の集計 =====")
+    print(f"入力トークン (IN): {total_input_tokens}")
+    print(f"出力トークン (OUT): {total_output_tokens}")
+    print(f"合計トークン (TOTAL): {total_tokens}")
+    print("=================================")
 
     # 判定結果に応じてPRに反映
     if action == "Comment":

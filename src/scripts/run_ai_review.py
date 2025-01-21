@@ -203,7 +203,7 @@ def main():
             file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
     review_content = ""
     for filename, guidelines in file_guidelines_map.items():
-        combined_guidelines += f"\n### {filename}\n{guidelines}\n"
+        review_content += f"\n### {filename}\n{guidelines}\n"
 
     # JSON パース
     action = determine_action(client, review_content)

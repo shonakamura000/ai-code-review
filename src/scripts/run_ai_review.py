@@ -6,8 +6,11 @@ import subprocess
 from pathlib import Path
 import requests
 from openai import OpenAI
-from llama_index import ServiceContext, StorageContext, load_index_from_storage
-from llama_index.llm_predictor import LLMPredictor
+from llama_index.core import StorageContext, load_index_from_storage
+from llama_index.core.query_engine import QueryEngine
+from llama_index.core import Settings
+from llama_index.llms.openai import OpenAI
+
 import re
 
 # 定数の定義
@@ -121,12 +124,10 @@ def main():
         return
 
     # LLMまわりの設定
-    llm_predictor = LLMPredictor(
-        llm=OpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
-    )
-    service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, chunk_size_limit=1024)
+    Settings.llm = OpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
+    Settings.chunk_size = 1024
 
-    query_engine = index.as_query_engine(service_context=service_context)
+    query_engine = index.as_query_engine()
 
     # ファイルごとに関連するガイドラインを取得して、結果をまとめる
     file_guidelines_map = {}
@@ -168,7 +169,7 @@ def main():
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=800  # 適当に制限する
+            max_tokens=800 
         )
         print(f"review_response:\n{review_response}")
     except Exception as e:

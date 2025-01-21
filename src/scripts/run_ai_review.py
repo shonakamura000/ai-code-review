@@ -178,6 +178,7 @@ def main():
 
     # ファイルごとに関連するガイドラインを取得して、結果をまとめる
     file_guidelines_map = {}
+    file_reviews_map = {}
 
     for filename, filediff in file_diff_map.items():
         query = (
@@ -196,14 +197,17 @@ def main():
                 code_guidelines=retrieved_guidelines
             )
             file_review = generate_review(client, prompt)
-            file_guidelines_map[filename] += f"\nレビュー:\n{file_review}"
+            # ガイドラインとは別にレビューのみを保存
+            file_reviews_map[filename] = file_review
 
         except Exception as e:
             print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
             file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
-    review_content = ""
-    for filename, guidelines in file_guidelines_map.items():
-        review_content += f"\n### {filename}\n{guidelines}\n"
+            file_reviews_map[filename] = "レビュー生成に失敗しました"
+
+    review_content = "Nakamura Code Rabbitによるコードレビュー/n# 問題点と修正点/n"
+    for filename, review_text in file_reviews_map.items():
+        review_content += f"\n### {filename}\n{review_text}\n"
 
     # JSON パース
     action = determine_action(client, review_content)

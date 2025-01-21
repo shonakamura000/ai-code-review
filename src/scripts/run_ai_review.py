@@ -177,14 +177,19 @@ def main():
     # JSON パース
     try:
         content = review_response.choices[0].message.content.strip()
+        print(f"content:{content}")
     except (IndexError, KeyError, json.JSONDecodeError) as e:
         print(f"API 応答を JSON として解釈できませんでした: {e}")
         print(f"応答内容: {review_response}")
         return
 
     # JSON に含まれる情報を取り出す
-    action = content.get("action", "Comment")
-    reason = content.get("reason", "理由が取得できませんでした。")
+    try:
+        action = content.get("action", "Comment")
+        reason = content.get("reason", "理由が取得できませんでした。")
+    except Exception as e:
+        print(f"Jsonからの情報取得中にエラーが起こりました: {e}")
+        return
 
     # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:

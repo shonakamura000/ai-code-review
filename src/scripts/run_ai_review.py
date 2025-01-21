@@ -7,7 +7,6 @@ from pathlib import Path
 import requests
 from openai import OpenAI
 from llama_index.core import StorageContext, load_index_from_storage
-from llama_index.core.query_engine import QueryEngine
 from llama_index.core import Settings
 from llama_index.llms.openai import OpenAI
 

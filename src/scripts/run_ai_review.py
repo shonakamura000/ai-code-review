@@ -174,6 +174,7 @@ def main():
         capture_output=True, text=True
     )
     raw_diff_text = diff_result.stdout.strip()
+    print(f"raw_diff_text:{raw_diff_text}")
 
     if not raw_diff_text:
         print("差分がないためレビューできません。")

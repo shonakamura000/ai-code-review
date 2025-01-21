@@ -123,6 +123,19 @@ def determine_action(client, review_content):
         print(f"アクション判定中にエラーが発生しました: {e}")
         return "Comment"
 
+def filter_diff_lines(diff_text):
+    filtered_lines = []
+    for line in diff_text.splitlines():
+        # 行番号表示は残す場合
+        if line.startswith("@@"):
+            filtered_lines.append(line)
+            continue
+        if line.startswith("-"):
+            # 削除行は除外
+            continue
+        # 追加行('+')か、文脈行(' ')かは残す
+        filtered_lines.append(line)
+    return "\n".join(filtered_lines)
 
 def main():
     # 環境変数と設定の取得
@@ -142,15 +155,17 @@ def main():
     diff_result = subprocess.run(
         ["git", "diff", "origin/main...HEAD"], capture_output=True, text=True
     )
-    diff_text = diff_result.stdout.strip()
+    raw_diff_text = diff_result.stdout.strip()
 
-    if not diff_text:
+    if not raw_diff_text:
         print("差分がないためレビューできません。")
         return
-    print(f"diff_text:\n{diff_text[:1000]}...") 
 
-    # diffをファイル単位に分割
-    file_diff_map = split_diff_by_file(diff_text)
+    # フィルタリングして削除行(-)は除外
+    filtered_diff_text = filter_diff_lines(raw_diff_text)
+
+    file_diff_map = split_diff_by_file(filtered_diff_text)
+
     if not file_diff_map:
         print("ファイル単位のdiffに分割できませんでした。")
         return

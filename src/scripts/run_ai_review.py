@@ -205,7 +205,7 @@ def main():
             file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
             file_reviews_map[filename] = "レビュー生成に失敗しました"
 
-    review_content = "Nakamura Code Rabbitによるコードレビュー/n# 問題点と修正点/n"
+    review_content = "Nakamura Code Rabbitによるコードレビュー\n# 問題点と修正点\n"
     for filename, review_text in file_reviews_map.items():
         review_content += f"\n### {filename}\n{review_text}\n"
 

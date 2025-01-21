@@ -48,8 +48,6 @@ def split_diff_by_file(diff_text):
     戻り値は {ファイルパス: そのファイルのdiff} の辞書を想定。
     """
     file_diffs = {}
-    # diffセパレータっぽい正規表現で分割する
-    # 例: diff --git a/path/to/file b/path/to/file
     pattern = r"^diff --git a/(.+?) b/\1"
     lines = diff_text.splitlines()
     
@@ -58,8 +56,6 @@ def split_diff_by_file(diff_text):
     
     for line in lines:
         if line.startswith("diff --git a/"):
-            # 新しいファイルdiffの開始
-            # これまでのファイルを登録
             if current_file and current_lines:
                 file_diffs[current_file] = "\n".join(current_lines)
             match = re.match(r"^diff --git a/(.+?) b/(.+)$", line)
@@ -178,47 +174,39 @@ def main():
 
     # ファイルごとに関連するガイドラインを取得して、結果をまとめる
     file_guidelines_map = {}
+    file_reviews_map = {}
 
     for filename, filediff in file_diff_map.items():
-        # ファイルの差分をRAGにかける
         query = (
             f"以下はファイル '{filename}' の差分です。"
-            "これに関連するコードガイドラインを教えてください:\n"
+            "これに関連するコードガイドラインを **日本語で** 教えてください:\n"
             f"{filediff}"
         )
         try:
             response = query_engine.query(query)
             retrieved_guidelines = str(response)
             file_guidelines_map[filename] = retrieved_guidelines
+
+            # ファイルごとにプロンプトを作成しレビュー生成
+            prompt = prompt_template.format(
+                diff_text=filediff,
+                code_guidelines=retrieved_guidelines
+            )
+            file_review = generate_review(client, prompt)
+            file_reviews_map[filename] = file_review
+
         except Exception as e:
             print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
             file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
+            file_reviews_map[filename] = "レビュー生成に失敗しました"
 
-    # ファイルごとのガイドライン情報をまとめて1つのコメントにする
-    combined_guidelines = ""
-    for filename, guidelines in file_guidelines_map.items():
-        combined_guidelines += f"\n### {filename}\n{guidelines}\n"
+    review_content = "Nakamura Code Rabbitによるコードレビュー\n# 問題点と修正点\n"
+    for filename, review_text in file_reviews_map.items():
+        review_content += f"\n### {filename}\n{review_text}\n"
 
-    # プロンプトに差分全体や取得したコード規約を埋め込む
-    # 今回はファイル単位のガイドライン結果をまとめたものを使う
-    prompt = prompt_template.format(
-        diff_text=diff_text,  
-        code_guidelines=combined_guidelines
-    )
-    print(f"prompt:\n{prompt}")
-
-    # OpenAI API 呼び出し
-    review_content = generate_review(client, prompt)
-    if not review_content:
-        print("レビューの生成に失敗しました。")
-        return
-
-    # JSON パース
     action = determine_action(client, review_content)
     print(f"アクション: {action}\nレビュー内容: {review_content}")
 
-
-    # PR 情報取得
     with open(event_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 

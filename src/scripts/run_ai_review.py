@@ -180,38 +180,30 @@ def main():
     file_guidelines_map = {}
 
     for filename, filediff in file_diff_map.items():
-        # ファイルの差分をRAGにかける
         query = (
             f"以下はファイル '{filename}' の差分です。"
-            "これに関連するコードガイドラインを教えてください:\n"
+            "これに関連するコードガイドラインを **日本語で** 教えてください:\n"
             f"{filediff}"
         )
         try:
             response = query_engine.query(query)
             retrieved_guidelines = str(response)
             file_guidelines_map[filename] = retrieved_guidelines
+
+            # ファイルごとにプロンプトを作成しレビュー生成
+            prompt = prompt_template.format(
+                diff_text=filediff,
+                code_guidelines=retrieved_guidelines
+            )
+            file_review = generate_review(client, prompt)
+            file_guidelines_map[filename] += f"\nレビュー:\n{file_review}"
+
         except Exception as e:
             print(f"LlamaIndex クエリ中にエラーが発生しました: {e}")
             file_guidelines_map[filename] = "ガイドライン取得に失敗しました"
-
-    # ファイルごとのガイドライン情報をまとめて1つのコメントにする
-    combined_guidelines = ""
+    review_content = ""
     for filename, guidelines in file_guidelines_map.items():
         combined_guidelines += f"\n### {filename}\n{guidelines}\n"
-
-    # プロンプトに差分全体や取得したコード規約を埋め込む
-    # 今回はファイル単位のガイドライン結果をまとめたものを使う
-    prompt = prompt_template.format(
-        diff_text=diff_text,  
-        code_guidelines=combined_guidelines
-    )
-    print(f"prompt:\n{prompt}")
-
-    # OpenAI API 呼び出し
-    review_content = generate_review(client, prompt)
-    if not review_content:
-        print("レビューの生成に失敗しました。")
-        return
 
     # JSON パース
     action = determine_action(client, review_content)

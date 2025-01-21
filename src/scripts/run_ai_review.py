@@ -154,7 +154,7 @@ def main():
     # プロンプトに差分全体や取得したコード規約を埋め込む
     # 今回はファイル単位のガイドライン結果をまとめたものを使う
     prompt = prompt_template.format(
-        diff_text=diff_text[:2000] + "...(省略)",  
+        diff_text=diff_text,  
         code_guidelines=combined_guidelines
     )
     print(f"prompt:\n{prompt}")
